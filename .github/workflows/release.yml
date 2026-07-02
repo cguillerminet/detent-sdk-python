@@ -1,0 +1,75 @@
+name: Release
+
+# Publishes detent-sdk to PyPI when a version tag is pushed (e.g. `v0.1.0`).
+# Auth is tokenless via PyPI Trusted Publishing (OIDC) — no API token secret.
+# One-time setup on PyPI: add a Trusted Publisher for project `detent-sdk`
+# (a "pending" publisher works before the first release) with:
+#   owner cguillerminet, repo detent-sdk-python, workflow release.yml.
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the GitHub Release
+  id-token: write # OIDC token for PyPI Trusted Publishing
+
+jobs:
+  release:
+    name: publish to PyPI
+    runs-on: ubuntu-latest
+    # Don't let forks attempt to publish under this name.
+    if: github.repository == 'cguillerminet/detent-sdk-python'
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install (dev extras + build)
+        run: pip install -e ".[dev]" build
+
+      - name: Verify tag matches package version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          PKG="v$(python -c 'import tomllib,pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          echo "tag=$TAG package=$PKG"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag $TAG does not match package version $PKG — bump pyproject or fix the tag."
+            exit 1
+          fi
+
+      - name: Lint + type-check + test
+        run: |
+          ruff check src tests
+          ruff format --check src tests
+          mypy src/detent
+          pytest -q
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      # Tokenless: PyPI Trusted Publishing exchanges the OIDC token. Uploads dist/*.
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      # Cut the matching GitHub Release (auto-generated notes). Idempotent.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists — skipping."
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              --latest \
+              --verify-tag
+          fi
