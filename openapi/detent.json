@@ -1,0 +1,1760 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "RateGuard API",
+    "description": "Rate Limiter as a Service — the public /v1 surface. POST /v1/limit always returns HTTP 200; the `allowed` field carries the verdict (DECISIONS.md §2.2). Authenticate with an `rg_live_`/`rg_test_` API key as a bearer token. The /metrics endpoint serves Prometheus text and is not modeled here.",
+    "contact": {
+      "name": "RateGuard"
+    },
+    "license": {
+      "name": "proprietary",
+      "identifier": "proprietary"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/dashboard/billing/checkout": {
+      "post": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`POST /dashboard/billing/checkout` — start a subscription Checkout Session.",
+        "operationId": "create_checkout",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stripe Checkout Session URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSessionUrl"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Billing is not enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/billing/portal": {
+      "post": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`POST /dashboard/billing/portal` — start a Billing Portal Session.",
+        "operationId": "create_portal",
+        "responses": {
+          "200": {
+            "description": "Stripe Billing Portal URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSessionUrl"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Billing is not enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No billing customer yet — subscribe first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/keys": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`GET /dashboard/keys` — list the account's keys (active and revoked),\nnewest first. Never returns the raw key or its hash.",
+        "operationId": "list_keys",
+        "responses": {
+          "200": {
+            "description": "The account's keys, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/KeySummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`POST /dashboard/keys` — mint a new live API key for the account.",
+        "operationId": "create_key",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateKeyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Key created; the raw secret is shown once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedKey"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active key limit reached for plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/keys/{id}": {
+      "delete": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`DELETE /dashboard/keys/{id}` — soft-revoke the account's key (sets\n`revoked_at`). Idempotent for an owned key; 404 if unknown or owned by\nanother account (no cross-tenant existence leak).",
+        "operationId": "revoke_key",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "API key id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Key revoked (idempotent for an owned key)"
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Key not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/me": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`GET /dashboard/me` — the authenticated account (proves JWT verification).",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "The authenticated account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/namespaces": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`GET /dashboard/namespaces` — the session account's namespace names, ascending.",
+        "operationId": "list_namespaces",
+        "responses": {
+          "200": {
+            "description": "The account's namespace names",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/namespaces/{ns}/rules": {
+      "put": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`PUT /dashboard/namespaces/{ns}/rules` — create or replace the namespace's\ndefault rule. Idempotent; also materializes the namespace. Validation mirrors\n`rules::create_rule`, plus a `concurrent_limit` guard (it is lease-based, not\na `/v1/limit` default — see DECISIONS.md §2.3 / §4.3).",
+        "operationId": "put_rule",
+        "parameters": [
+          {
+            "name": "ns",
+            "in": "path",
+            "description": "Namespace name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rule created or replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit/window_ms invalid, or concurrent_limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Algorithm not available on the account's plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/namespaces/{ns}/stats": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`GET /dashboard/namespaces/{ns}/stats` — aggregated usage for the session account.",
+        "operationId": "dashboard_stats",
+        "parameters": [
+          {
+            "name": "ns",
+            "in": "path",
+            "description": "Namespace name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated daily usage + month/quota rollup (§4.2)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/passkeys": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`GET /dashboard/passkeys` — list the caller's enrolled passkeys.",
+        "operationId": "list_passkeys",
+        "responses": {
+          "200": {
+            "description": "The account's enrolled passkeys",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CredentialRow"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/passkeys/{id}": {
+      "delete": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`DELETE /dashboard/passkeys/{id}` — remove a passkey.",
+        "description": "Refused (409) when this would be the last passkey AND no unused recovery codes exist,\nto prevent an account from locking itself out of every factor-2 option.",
+        "operationId": "delete_passkey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Passkey id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Fresh WebAuthn step-up token (§3.5)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Passkey removed (idempotent for an owned id)"
+          },
+          "401": {
+            "description": "Missing or invalid access/step-up token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Refused: would leave the account with no second factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/rules": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`GET /dashboard/rules` — every namespace for the session account with its\noptional default rule, ascending. One query (LEFT JOIN), no N+1.",
+        "operationId": "list_rules",
+        "responses": {
+          "200": {
+            "description": "The account's namespaces + optional default rules",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/NamespaceRule"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness probe.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Service is live"
+          }
+        }
+      }
+    },
+    "/v1/leases": {
+      "post": {
+        "tags": [
+          "leases"
+        ],
+        "summary": "`POST /v1/leases` — acquire a concurrent-limit lease (`DECISIONS.md §1.3`).",
+        "operationId": "acquire_lease",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcquireBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Lease decision — always 200; `allowed` carries the verdict, `lease_id` set when allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcquireResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed / missing limit+window_ms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "concurrent_limit is not available on the caller's plan (§4.3)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/leases/{lease_id}": {
+      "delete": {
+        "tags": [
+          "leases"
+        ],
+        "summary": "`DELETE /v1/leases/{lease_id}` — release a lease. Idempotent. Unlike acquire,\na Redis outage is a `503` (NOT fail-open): a false \"released\" would mislead.",
+        "operationId": "release_lease",
+        "parameters": [
+          {
+            "name": "lease_id",
+            "in": "path",
+            "description": "Opaque lease handle from acquire",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release result (idempotent)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed lease id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Redis unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/limit": {
+      "post": {
+        "tags": [
+          "limit"
+        ],
+        "summary": "`POST /v1/limit` handler. `AuthContext` is injected by the auth middleware\n(`crate::auth::require_auth`); the tenant `account_id` comes from the\nvalidated key, never the request body (`DECISIONS.md §3.3`).",
+        "operationId": "limit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LimitBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Verdict — always 200, even when denied (DECISIONS.md §2.2)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LimitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Algorithm not available on the caller's plan (§4.3)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/namespaces/{ns}/keys/{key}": {
+      "delete": {
+        "tags": [
+          "keys"
+        ],
+        "summary": "`DELETE /v1/namespaces/{ns}/keys/{key}` — reset the limiter counter for one\nkey. 204 (idempotent) on success; 503 if Redis is unavailable (NOT\nfail-open — a silent success while Redis is down would mislead the operator).",
+        "operationId": "reset_key",
+        "parameters": [
+          {
+            "name": "ns",
+            "in": "path",
+            "description": "Namespace name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Limiter key to reset",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Counter reset (idempotent)"
+          },
+          "400": {
+            "description": "namespace/key empty",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Redis unavailable (NOT fail-open here)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/namespaces/{ns}/rules": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "`GET /v1/namespaces/{ns}/rules` — fetch the namespace's rule (404 if none).",
+        "operationId": "read_rule",
+        "parameters": [
+          {
+            "name": "ns",
+            "in": "path",
+            "description": "Namespace name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The namespace's default rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rule"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No rule for this namespace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "`POST /v1/namespaces/{ns}/rules` — create or replace the namespace's rule.",
+        "operationId": "create_rule",
+        "parameters": [
+          {
+            "name": "ns",
+            "in": "path",
+            "description": "Namespace name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Rule created or replaced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "limit/window_ms invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Algorithm not available on the caller's plan (§4.3)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/namespaces/{ns}/stats": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "`GET /v1/namespaces/{ns}/stats` — aggregated daily usage from Postgres.",
+        "operationId": "get_stats",
+        "parameters": [
+          {
+            "name": "ns",
+            "in": "path",
+            "description": "Namespace name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aggregated daily usage + month/quota rollup (§4.2)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/webhook": {
+      "get": {
+        "tags": [
+          "webhook"
+        ],
+        "summary": "`GET /v1/webhook` — current config (404 if none). The secret is not returned.",
+        "operationId": "get_webhook",
+        "responses": {
+          "200": {
+            "description": "Current webhook config (secret omitted)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookConfig"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No webhook configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "webhook"
+        ],
+        "summary": "`PUT /v1/webhook` — set or replace the account's webhook (rotates the secret).",
+        "operationId": "put_webhook",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookConfigBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook set/replaced; secret returned once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "URL failed SSRF screening",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Webhooks require the Pro or Scale plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "webhook"
+        ],
+        "summary": "`DELETE /v1/webhook` — remove the webhook config.",
+        "operationId": "delete_webhook",
+        "responses": {
+          "204": {
+            "description": "Webhook removed (idempotent)"
+          },
+          "401": {
+            "description": "Missing or invalid API key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "plan",
+          "in_good_standing"
+        ],
+        "properties": {
+          "current_period_end": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "in_good_standing": {
+            "type": "boolean"
+          },
+          "plan": {
+            "type": "string"
+          },
+          "subscription_status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "trial_ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "RFC3339; null while no trial / already subscribed past trial."
+          }
+        }
+      },
+      "AcquireBody": {
+        "type": "object",
+        "description": "Body for `POST /v1/leases`. `limit`/`window_ms` are optional: inline wins,\nelse the namespace's `concurrent_limit` rule fills them (`§2.3`).",
+        "required": [
+          "namespace",
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Max concurrent slots. Optional when a concurrent rule exists.",
+            "minimum": 0
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "window_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Lease TTL in milliseconds. Optional when a concurrent rule exists.",
+            "minimum": 0
+          }
+        }
+      },
+      "AcquireResponse": {
+        "type": "object",
+        "description": "Response for `POST /v1/leases`. Always HTTP 200 (`§2.2`); `allowed` carries\nthe verdict. `lease_id` is present only when `allowed` is true.\n\nWhen `lease_id` is `null` due to fail-open (Redis unavailable), `active` and\n`reset_ms` are not meaningful measurements — they reflect no real state.",
+        "required": [
+          "allowed",
+          "active",
+          "limit",
+          "reset_ms"
+        ],
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Active lease count after this call.",
+            "minimum": 0
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "lease_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "reset_ms": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When denied, ms until the soonest-expiring lease frees a slot.",
+            "minimum": 0
+          }
+        }
+      },
+      "BillingSessionUrl": {
+        "type": "object",
+        "description": "Response body for both billing session endpoints: the Stripe-hosted URL to\nredirect the browser to.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "CheckoutBody": {
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "properties": {
+          "plan": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateKeyBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreatedKey": {
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "prefix",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string",
+            "description": "The raw `rg_live_…` secret — shown ONCE, never retrievable again."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prefix": {
+            "type": "string"
+          }
+        }
+      },
+      "CredentialRow": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "DayStat": {
+        "type": "object",
+        "required": [
+          "day",
+          "total",
+          "blocked"
+        ],
+        "properties": {
+          "blocked": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "day": {
+            "type": "string"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "The JSON body returned for every error response: `{ \"error\": \"<message>\" }`.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable error message. Never contains internal/driver detail."
+          }
+        }
+      },
+      "KeySummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "prefix",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string"
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prefix": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "LimitBody": {
+        "type": "object",
+        "description": "Request body for `POST /v1/limit`. The wire format uses `window_ms`\n(`DECISIONS.md §2.1`); `algorithm` deserializes from its snake_case name.\n\n`algorithm`/`limit`/`window_ms` are optional: when omitted they fall back to\nthe namespace's default rule (`§2.3`). Inline values win per-field.",
+        "required": [
+          "namespace",
+          "key"
+        ],
+        "properties": {
+          "algorithm": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "sliding_window"
+          },
+          "key": {
+            "type": "string"
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "window_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "LimitResponse": {
+        "type": "object",
+        "description": "Response body. The endpoint always returns HTTP 200 (`DECISIONS.md §2.2`);\n`allowed` carries the verdict.",
+        "required": [
+          "allowed",
+          "remaining",
+          "reset_ms",
+          "limit"
+        ],
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "remaining": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "reset_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "MonthSummary": {
+        "type": "object",
+        "description": "Current-month rollup + soft-quota state (`§4.2`), per account (across all\nnamespaces). This is the data source for the dashboard quota banner.",
+        "required": [
+          "month",
+          "total",
+          "over_quota"
+        ],
+        "properties": {
+          "month": {
+            "type": "string"
+          },
+          "over_quota": {
+            "type": "boolean"
+          },
+          "quota": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NamespaceRule": {
+        "type": "object",
+        "description": "One namespace and its optional default rule. `rule` is null when the\nnamespace exists (e.g. seen by a `/v1/limit` call) but has no default yet.",
+        "required": [
+          "namespace"
+        ],
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "rule": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Rule"
+              }
+            ]
+          }
+        }
+      },
+      "ReleaseResponse": {
+        "type": "object",
+        "description": "Response for `DELETE /v1/leases/{lease_id}`.",
+        "required": [
+          "released",
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Active lease count after this call.",
+            "minimum": 0
+          },
+          "released": {
+            "type": "boolean",
+            "description": "Whether a held lease was removed (false if already expired/released)."
+          }
+        }
+      },
+      "Rule": {
+        "type": "object",
+        "description": "The default rule for a namespace. `limit`/`window_ms` are `u64` on the wire\nbut stored as `int`/`bigint`; values are range-checked before insert.",
+        "required": [
+          "namespace",
+          "algorithm",
+          "limit",
+          "window_ms"
+        ],
+        "properties": {
+          "algorithm": {
+            "type": "string",
+            "example": "sliding_window"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "window_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "RuleBody": {
+        "type": "object",
+        "description": "Body for `POST /v1/namespaces/{ns}/rules`. The namespace comes from the path.",
+        "required": [
+          "algorithm",
+          "limit",
+          "window_ms"
+        ],
+        "properties": {
+          "algorithm": {
+            "type": "string",
+            "example": "token_bucket"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "window_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "StatsResponse": {
+        "type": "object",
+        "required": [
+          "namespace",
+          "total",
+          "blocked",
+          "days",
+          "month"
+        ],
+        "properties": {
+          "blocked": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DayStat"
+            }
+          },
+          "month": {
+            "$ref": "#/components/schemas/MonthSummary"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "WebhookConfig": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "WebhookConfigBody": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "WebhookCreated": {
+        "type": "object",
+        "required": [
+          "url",
+          "secret"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "api_key": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "RateGuard API key as a bearer token"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "limit",
+      "description": "The rate-limit hot path"
+    },
+    {
+      "name": "rules",
+      "description": "Per-namespace default rules"
+    },
+    {
+      "name": "stats",
+      "description": "Usage analytics"
+    },
+    {
+      "name": "webhook",
+      "description": "Account webhook configuration"
+    },
+    {
+      "name": "keys",
+      "description": "Manual counter reset"
+    },
+    {
+      "name": "leases",
+      "description": "Concurrent-limit leases (acquire/release)"
+    },
+    {
+      "name": "health",
+      "description": "Liveness"
+    },
+    {
+      "name": "dashboard",
+      "description": "Dashboard session endpoints (JWT-authed)"
+    }
+  ]
+}
