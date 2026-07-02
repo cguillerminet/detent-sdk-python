@@ -1,5 +1,6 @@
 """Typed Python client for the Detent rate-limiting API."""
 
+from .async_client import AsyncDetent
 from .client import Detent
 from .errors import (
     DetentAPIError,
@@ -19,6 +20,7 @@ from .models import (
 
 __all__ = [
     "Detent",
+    "AsyncDetent",
     "DetentError",
     "DetentAPIError",
     "DetentTransportError",
