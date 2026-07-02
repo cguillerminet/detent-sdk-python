@@ -26,6 +26,6 @@ class DetentTransportError(DetentError):
 class DetentLeaseDenied(DetentError):
     """Raised by lease() when a concurrent slot could not be acquired."""
 
-    def __init__(self, result: "AcquireResult") -> None:
+    def __init__(self, result: AcquireResult) -> None:
         super().__init__("Lease denied: no concurrent slot available")
         self.result = result

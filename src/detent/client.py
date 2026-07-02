@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from types import TracebackType
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 
 from . import _core
 from ._config import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, FailMode
 from .errors import DetentError, DetentLeaseDenied, DetentTransportError
-from .models import Algorithm, AcquireResult, LimitResult, ReleaseResult, StatsResult
+from .models import AcquireResult, Algorithm, LimitResult, ReleaseResult, StatsResult
 
 
 class Detent:
@@ -37,7 +37,9 @@ class Detent:
             transport=transport,
         )
 
-    def _request(self, method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _request(
+        self, method: str, path: str, body: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         try:
             resp = self._client.request(method, path, json=body)
         except httpx.TransportError as exc:
@@ -75,7 +77,9 @@ class Detent:
         limit: int | None = None,
         window_ms: int | None = None,
     ) -> AcquireResult:
-        data = self._request("POST", _core.LEASES_PATH, _core.acquire_body(namespace, key, limit, window_ms))
+        data = self._request(
+            "POST", _core.LEASES_PATH, _core.acquire_body(namespace, key, limit, window_ms)
+        )
         return _core.parse_acquire(data)
 
     def release(self, lease_id: str) -> ReleaseResult:
@@ -112,7 +116,7 @@ class Detent:
     def close(self) -> None:
         self._client.close()
 
-    def __enter__(self) -> "Detent":
+    def __enter__(self) -> Detent:
         return self
 
     def __exit__(

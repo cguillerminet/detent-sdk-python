@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from types import TracebackType
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 
 from . import _core
 from ._config import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, FailMode
 from .errors import DetentError, DetentLeaseDenied, DetentTransportError
-from .models import Algorithm, AcquireResult, LimitResult, ReleaseResult, StatsResult
+from .models import AcquireResult, Algorithm, LimitResult, ReleaseResult, StatsResult
 
 
 class AsyncDetent:
@@ -116,7 +116,7 @@ class AsyncDetent:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def __aenter__(self) -> "AsyncDetent":
+    async def __aenter__(self) -> AsyncDetent:
         return self
 
     async def __aexit__(

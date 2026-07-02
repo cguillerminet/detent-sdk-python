@@ -1,8 +1,8 @@
 from detent.errors import (
-    DetentError,
     DetentAPIError,
-    DetentTransportError,
+    DetentError,
     DetentLeaseDenied,
+    DetentTransportError,
 )
 from detent.models import AcquireResult, LimitResult
 

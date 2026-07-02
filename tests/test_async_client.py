@@ -15,7 +15,9 @@ def make(handler, **kw):
 
 async def test_limit_parses():
     def handler(req):
-        return httpx.Response(200, json={"allowed": True, "remaining": 9, "reset_ms": 5, "limit": 10})
+        return httpx.Response(
+            200, json={"allowed": True, "remaining": 9, "reset_ms": 5, "limit": 10}
+        )
 
     r = await make(handler).limit(namespace="api", key="u1")
     assert r == LimitResult(True, 9, 5, 10, False)
@@ -47,7 +49,8 @@ async def test_lease_releases_when_body_raises():
         seen.append(req.method)
         if req.method == "POST":
             return httpx.Response(
-                200, json={"allowed": True, "lease_id": "LID", "active": 1, "limit": 5, "reset_ms": 0}
+                200,
+                json={"allowed": True, "lease_id": "LID", "active": 1, "limit": 5, "reset_ms": 0},
             )
         return httpx.Response(200, json={"released": True, "active": 0})
 
@@ -60,7 +63,9 @@ async def test_lease_releases_when_body_raises():
 
 async def test_lease_denied_raises():
     def handler(req):
-        return httpx.Response(200, json={"allowed": False, "active": 5, "limit": 5, "reset_ms": 300})
+        return httpx.Response(
+            200, json={"allowed": False, "active": 5, "limit": 5, "reset_ms": 300}
+        )
 
     with pytest.raises(DetentLeaseDenied):
         async with make(handler).lease(namespace="n", key="k"):

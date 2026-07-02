@@ -26,7 +26,9 @@ def test_limit_sends_bearer_and_body_and_parses():
         assert req.headers["Authorization"] == "Bearer rg_test_x"
         assert req.url.path == "/v1/limit"
         assert json.loads(req.content) == {"namespace": "api", "key": "u1", "window_ms": 60000}
-        return httpx.Response(200, json={"allowed": True, "remaining": 9, "reset_ms": 5, "limit": 10})
+        return httpx.Response(
+            200, json={"allowed": True, "remaining": 9, "reset_ms": 5, "limit": 10}
+        )
 
     r = make(handler).limit(namespace="api", key="u1", window_ms=60000)
     assert r == LimitResult(allowed=True, remaining=9, reset_ms=5, limit=10, degraded=False)
@@ -34,7 +36,9 @@ def test_limit_sends_bearer_and_body_and_parses():
 
 def test_limit_200_denial_is_not_an_error():
     def handler(req):
-        return httpx.Response(200, json={"allowed": False, "remaining": 0, "reset_ms": 1, "limit": 10})
+        return httpx.Response(
+            200, json={"allowed": False, "remaining": 0, "reset_ms": 1, "limit": 10}
+        )
 
     r = make(handler).limit(namespace="api", key="u1")
     assert r.allowed is False and r.degraded is False
@@ -76,7 +80,8 @@ def test_acquire_and_release_paths():
         seen.append(f"{req.method} {req.url.path}")
         if req.method == "POST":
             return httpx.Response(
-                200, json={"allowed": True, "lease_id": "LID", "active": 1, "limit": 5, "reset_ms": 0}
+                200,
+                json={"allowed": True, "lease_id": "LID", "active": 1, "limit": 5, "reset_ms": 0},
             )
         return httpx.Response(200, json={"released": True, "active": 0})
 
@@ -95,7 +100,8 @@ def test_lease_releases_even_when_body_raises():
         seen.append(req.method)
         if req.method == "POST":
             return httpx.Response(
-                200, json={"allowed": True, "lease_id": "LID", "active": 1, "limit": 5, "reset_ms": 0}
+                200,
+                json={"allowed": True, "lease_id": "LID", "active": 1, "limit": 5, "reset_ms": 0},
             )
         return httpx.Response(200, json={"released": True, "active": 0})
 
@@ -111,7 +117,9 @@ def test_lease_denied_raises_and_skips_release():
 
     def handler(req):
         seen.append(req.method)
-        return httpx.Response(200, json={"allowed": False, "active": 5, "limit": 5, "reset_ms": 300})
+        return httpx.Response(
+            200, json={"allowed": False, "active": 5, "limit": 5, "reset_ms": 300}
+        )
 
     rg = make(handler)
     with pytest.raises(DetentLeaseDenied):
