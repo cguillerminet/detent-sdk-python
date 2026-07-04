@@ -14,7 +14,7 @@ from detent import (
 
 def make(handler, **kw):
     return Detent(
-        api_key="rg_test_x",
+        api_key="dt_test_x",
         base_url="https://api.example.com",
         transport=httpx.MockTransport(handler),
         **kw,
@@ -23,7 +23,7 @@ def make(handler, **kw):
 
 def test_limit_sends_bearer_and_body_and_parses():
     def handler(req: httpx.Request) -> httpx.Response:
-        assert req.headers["Authorization"] == "Bearer rg_test_x"
+        assert req.headers["Authorization"] == "Bearer dt_test_x"
         assert req.url.path == "/v1/limit"
         assert json.loads(req.content) == {"namespace": "api", "key": "u1", "window_ms": 60000}
         return httpx.Response(

@@ -1,10 +1,10 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "RateGuard API",
-    "description": "Rate Limiter as a Service — the public /v1 surface. POST /v1/limit always returns HTTP 200; the `allowed` field carries the verdict (DECISIONS.md §2.2). Authenticate with an `rg_live_`/`rg_test_` API key as a bearer token. The /metrics endpoint serves Prometheus text and is not modeled here.",
+    "title": "Detent API",
+    "description": "Rate Limiter as a Service — the public /v1 surface. POST /v1/limit always returns HTTP 200; the `allowed` field carries the verdict (DECISIONS.md §2.2). Authenticate with an `dt_live_`/`dt_test_` API key as a bearer token. The /metrics endpoint serves Prometheus text and is not modeled here.",
     "contact": {
-      "name": "RateGuard"
+      "name": "Detent"
     },
     "license": {
       "name": "proprietary",
@@ -114,6 +114,101 @@
           },
           "409": {
             "description": "No billing customer yet — subscribe first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/billing/reconcile": {
+      "post": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`POST /dashboard/billing/reconcile` — fast-path subscription sync on the\ncheckout success redirect. Retrieves the Checkout Session, verifies it\nbelongs to the caller, and — only if it was `paid` — fills in the account's\nsubscription status. Idempotent and safe alongside the webhook: it sets a\nstatus only when none is set yet, so it never regresses a later\npast_due/canceled the webhook may have written, and doesn't stamp\n`last_stripe_event_at` (so subsequent webhook events still apply in order).",
+        "operationId": "reconcile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Reconciled (or nothing to do yet)"
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Session does not belong to this account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Billing is not enabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/billing/usage": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`GET /dashboard/billing/usage` — the session account's month rollup, for the\nbilling quota-to-upgrade nudge. 404s when billing is disabled (consistent\nwith the other `/dashboard/billing/*` routes); gated on the flag only, so it\nneeds no Stripe client.",
+        "operationId": "dashboard_billing_usage",
+        "responses": {
+          "200": {
+            "description": "Account-wide current-month usage + soft quota (§4.2)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Billing is not enabled",
             "content": {
               "application/json": {
                 "schema": {
@@ -318,6 +413,41 @@
         }
       }
     },
+    "/dashboard/namespaces/{ns}": {
+      "delete": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`DELETE /dashboard/namespaces/{ns}` — remove a namespace and its history for\nthe session account. Idempotent: returns 204 whether or not it existed (a\nconcurrent usage flush may already have removed or recreated it, and the SPA\nreloads the list afterward). Purges the default rule and `usage_daily`\nhistory; leaves `usage_monthly` (the per-account billing meter) and Redis TTL\ncounters untouched. See\ndocs/superpowers/specs/2026-07-03-dashboard-namespace-delete-design.md.",
+        "operationId": "delete_namespace",
+        "parameters": [
+          {
+            "name": "ns",
+            "in": "path",
+            "description": "Namespace name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Namespace deleted (idempotent)"
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/dashboard/namespaces/{ns}/rules": {
       "put": {
         "tags": [
@@ -466,6 +596,135 @@
         }
       }
     },
+    "/dashboard/passkeys/add/finish": {
+      "post": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`POST /dashboard/passkeys/add/finish` — complete the additional-passkey ceremony.",
+        "description": "Step-up gated. Verifies the WebAuthn registration, CAS-claims the ceremony,\nstores the credential with the given name (or a User-Agent-derived fallback),\nemails a security notice, and returns the new row.",
+        "operationId": "add_passkey_finish",
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Fresh WebAuthn step-up token (§3.5)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPasskeyFinishBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Passkey enrolled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialRow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad ceremony state or name too long",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid access or step-up token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not this account's add-passkey ceremony",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Authenticator already enrolled (duplicate credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Ceremony already completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard/passkeys/add/start": {
+      "post": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`POST /dashboard/passkeys/add/start` — begin enrolling an additional passkey.",
+        "description": "Step-up gated (`SudoAuth`). Excludes the account's existing credentials so a\nsecond passkey can't be minted on an authenticator already enrolled.",
+        "operationId": "add_passkey_start",
+        "parameters": [
+          {
+            "name": "X-Step-Up-Token",
+            "in": "header",
+            "description": "Fresh WebAuthn step-up token (§3.5)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "WebAuthn creation options"
+          },
+          "401": {
+            "description": "Missing/invalid access or step-up token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/dashboard/passkeys/{id}": {
       "delete": {
         "tags": [
@@ -510,6 +769,77 @@
           },
           "409": {
             "description": "Refused: would leave the account with no second factor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`PATCH /dashboard/passkeys/{id}` — rename an owned passkey.",
+        "description": "Cosmetic, so access token only (no step-up). Name is trimmed and must be\n1–64 characters. Returns the updated row, or 404 if the id is not this\naccount's.",
+        "operationId": "rename_passkey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Passkey id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenamePasskeyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Passkey renamed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialRow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Name empty or longer than 64 chars",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such passkey for this account",
             "content": {
               "application/json": {
                 "schema": {
@@ -1162,7 +1492,8 @@
           "id",
           "email",
           "plan",
-          "in_good_standing"
+          "in_good_standing",
+          "has_billing_customer"
         ],
         "properties": {
           "current_period_end": {
@@ -1173,6 +1504,10 @@
           },
           "email": {
             "type": "string"
+          },
+          "has_billing_customer": {
+            "type": "boolean",
+            "description": "True once a Stripe customer exists — the SPA routes plan changes to the\nBilling Portal (existing customer) vs. Checkout (new)."
           },
           "id": {
             "type": "string"
@@ -1270,6 +1605,29 @@
           }
         }
       },
+      "AddPasskeyFinishBody": {
+        "type": "object",
+        "required": [
+          "challenge_id",
+          "credential"
+        ],
+        "properties": {
+          "challenge_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "credential": {
+            "type": "object"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional device name (1–64 chars). Empty/absent → derived from User-Agent."
+          }
+        }
+      },
       "BillingSessionUrl": {
         "type": "object",
         "description": "Response body for both billing session endpoints: the Stripe-hosted URL to\nredirect the browser to.",
@@ -1322,7 +1680,7 @@
           },
           "key": {
             "type": "string",
-            "description": "The raw `rg_live_…` secret — shown ONCE, never retrievable again."
+            "description": "The raw `dt_live_…` secret — shown ONCE, never retrievable again."
           },
           "name": {
             "type": [
@@ -1559,6 +1917,17 @@
           }
         }
       },
+      "ReconcileBody": {
+        "type": "object",
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string"
+          }
+        }
+      },
       "ReleaseResponse": {
         "type": "object",
         "description": "Response for `DELETE /v1/leases/{lease_id}`.",
@@ -1576,6 +1945,18 @@
           "released": {
             "type": "boolean",
             "description": "Whether a held lease was removed (false if already expired/released)."
+          }
+        }
+      },
+      "RenamePasskeyBody": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "New display name (1–64 characters after trimming)."
           }
         }
       },
@@ -1719,7 +2100,7 @@
       "api_key": {
         "type": "http",
         "scheme": "bearer",
-        "description": "RateGuard API key as a bearer token"
+        "description": "Detent API key as a bearer token"
       }
     }
   },

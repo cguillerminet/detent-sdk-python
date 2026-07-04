@@ -6,7 +6,7 @@ from detent import AcquireResult, AsyncDetent, DetentAPIError, DetentLeaseDenied
 
 def make(handler, **kw):
     return AsyncDetent(
-        api_key="rg_test_x",
+        api_key="dt_test_x",
         base_url="https://api.example.com",
         transport=httpx.MockTransport(handler),
         **kw,

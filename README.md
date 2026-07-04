@@ -11,7 +11,7 @@ pip install detent-sdk
 ```python
 from detent import Detent
 
-rg = Detent(api_key="rg_live_...")
+rg = Detent(api_key="dt_live_...")
 
 # Rate-limit check (fails open by default on transport error or 5xx)
 r = rg.limit(namespace="api", key=user_id)
@@ -31,7 +31,7 @@ stats = rg.get_stats(namespace="api")
 ```python
 from detent import AsyncDetent
 
-async with AsyncDetent(api_key="rg_live_...") as rg:
+async with AsyncDetent(api_key="dt_live_...") as rg:
     r = await rg.limit(namespace="api", key=user_id)
     async with rg.lease(namespace="jobs", key=user_id):
         await run_expensive_job()
@@ -41,7 +41,7 @@ async with AsyncDetent(api_key="rg_live_...") as rg:
 
 | Option      | Default                    | Notes                                                    |
 |-------------|----------------------------|----------------------------------------------------------|
-| `api_key`   | — (required)               | `rg_live_…` / `rg_test_…`                                 |
+| `api_key`   | — (required)               | `dt_live_…` / `dt_test_…`                                 |
 | `base_url`  | `https://api.detent.dev`   | Override for self-host / tests                            |
 | `timeout`   | `1.0`                      | Seconds; client-side transport timeout                    |
 | `fail_mode` | `"open"`                   | `"open"` allows, `"closed"` denies on a degraded backend  |
