@@ -956,6 +956,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Monthly hard ceiling exceeded (§4.2 anti-abuse cap)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -1082,6 +1092,16 @@
           },
           "403": {
             "description": "Algorithm not available on the caller's plan (§4.3)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Monthly hard ceiling exceeded (§4.2 anti-abuse cap)",
             "content": {
               "application/json": {
                 "schema": {
