@@ -51,6 +51,13 @@ async with AsyncDetent(api_key="dt_live_...") as rg:
 returns a result with `degraded=True`. A `4xx` (bad key, plan gate, unknown
 rule) raises `DetentAPIError`.
 
+**`acquire()` / `lease()` do *not* fail open** — unlike `limit()`, they raise
+`DetentTransportError` when Detent is unreachable, regardless of `fail_mode`. A
+failed-open acquire would return no `lease_id`, so the work would run holding a
+slot it can never release (a lease leak). Raising lets you decide whether to
+proceed or shed load. This is distinct from the server's own Redis fail-open,
+where the API still returns `200` with `allowed=True` and a `None` `lease_id`.
+
 When an account exceeds its monthly hard ceiling the API returns `429`, and
 `limit()`/`acquire()` raise **`DetentQuotaExceeded`** (a `DetentAPIError`
 subclass carrying `status`/`body`). It is **never** failed open — the cap is a
