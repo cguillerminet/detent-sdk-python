@@ -80,3 +80,13 @@ async def test_acquire_returns_result():
 
     acq = await make(handler).acquire(namespace="n", key="k")
     assert acq == AcquireResult(True, "LID", 1, 5, 0)
+
+
+async def test_limit_raises_quota_exceeded_on_hard_cap_never_fail_open():
+    from detent import DetentQuotaExceeded
+
+    def handler(req):
+        return httpx.Response(429, json={"error": "monthly_hard_cap"})
+
+    with pytest.raises(DetentQuotaExceeded):
+        await make(handler, fail_mode="open").limit(namespace="api", key="u1")

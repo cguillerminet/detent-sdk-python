@@ -45,3 +45,17 @@ def test_should_degrade():
     assert _core.should_degrade(DetentTransportError("x")) is True
     assert _core.should_degrade(DetentAPIError(503, {"error": "x"})) is True
     assert _core.should_degrade(DetentAPIError(401, {"error": "x"})) is False
+
+
+def test_api_error_types_the_monthly_hard_cap():
+    from detent.errors import DetentQuotaExceeded
+
+    e = _core.api_error(429, {"error": "monthly_hard_cap"})
+    assert isinstance(e, DetentQuotaExceeded)
+    assert isinstance(e, DetentAPIError)
+    assert e.status == 429
+    # A hard cap must never fail open — it is a deliberate block.
+    assert _core.should_degrade(e) is False
+    # A 429 with any other body stays a generic DetentAPIError.
+    other = _core.api_error(429, {"error": "slow down"})
+    assert type(other) is DetentAPIError

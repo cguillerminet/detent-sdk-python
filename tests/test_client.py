@@ -144,3 +144,25 @@ def test_get_stats_maps_response():
 
     s = make(handler).get_stats(namespace="api")
     assert s.total == 100 and s.month.over_quota is False and s.days[0].day == "2026-07-01"
+
+
+def test_limit_raises_quota_exceeded_on_hard_cap_never_fail_open():
+    from detent import DetentQuotaExceeded
+
+    def handler(req):
+        return httpx.Response(429, json={"error": "monthly_hard_cap"})
+
+    # fail_mode="open" must NOT suppress the hard cap.
+    with pytest.raises(DetentQuotaExceeded) as ei:
+        make(handler, fail_mode="open").limit(namespace="api", key="u1")
+    assert ei.value.status == 429
+
+
+def test_acquire_raises_quota_exceeded_on_hard_cap():
+    from detent import DetentQuotaExceeded
+
+    def handler(req):
+        return httpx.Response(429, json={"error": "monthly_hard_cap"})
+
+    with pytest.raises(DetentQuotaExceeded):
+        make(handler).acquire(namespace="n", key="k")

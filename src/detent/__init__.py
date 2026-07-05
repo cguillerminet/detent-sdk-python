@@ -6,6 +6,7 @@ from .errors import (
     DetentAPIError,
     DetentError,
     DetentLeaseDenied,
+    DetentQuotaExceeded,
     DetentTransportError,
 )
 from .models import (
@@ -25,6 +26,7 @@ __all__ = [
     "DetentAPIError",
     "DetentTransportError",
     "DetentLeaseDenied",
+    "DetentQuotaExceeded",
     "LimitResult",
     "AcquireResult",
     "ReleaseResult",

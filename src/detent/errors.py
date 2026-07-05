@@ -19,6 +19,21 @@ class DetentAPIError(DetentError):
         self.body = body
 
 
+class DetentQuotaExceeded(DetentAPIError):
+    """The account exceeded its monthly hard ceiling (anti-abuse cap, §4.2).
+
+    The API returned ``429 {"error": "monthly_hard_cap"}`` from ``/v1/limit`` or
+    ``/v1/leases``. Subclasses :class:`DetentAPIError`, so it carries ``status``
+    (always 429) and ``body``, and existing ``DetentAPIError`` handling still
+    applies. It is **never** failed open — the cap is a deliberate block. Catch
+    it specifically to alert or prompt an upgrade rather than treating it as a
+    routine denial.
+    """
+
+    def __init__(self, body: dict[str, str]) -> None:
+        super().__init__(429, body)
+
+
 class DetentTransportError(DetentError):
     """A network/DNS/timeout failure reaching the Detent API."""
 
