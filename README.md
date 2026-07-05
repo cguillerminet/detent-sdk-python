@@ -50,3 +50,19 @@ async with AsyncDetent(api_key="dt_live_...") as rg:
 `limit()` never raises on a degraded backend (transport error or 5xx) — it
 returns a result with `degraded=True`. A `4xx` (bad key, plan gate, unknown
 rule) raises `DetentAPIError`.
+
+When an account exceeds its monthly hard ceiling the API returns `429`, and
+`limit()`/`acquire()` raise **`DetentQuotaExceeded`** (a `DetentAPIError`
+subclass carrying `status`/`body`). It is **never** failed open — the cap is a
+deliberate block. Catch it to alert or prompt an upgrade:
+
+```python
+from detent import DetentQuotaExceeded
+
+try:
+    result = client.limit(namespace="api", key=user_id)
+    if not result.allowed:
+        ...  # routine per-key rate deny → return HTTP 429
+except DetentQuotaExceeded:
+    ...  # account over its monthly ceiling → page ops / upgrade nudge
+```

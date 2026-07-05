@@ -5,7 +5,12 @@ from typing import Any
 from urllib.parse import quote
 
 from ._config import FailMode
-from .errors import DetentAPIError, DetentError, DetentTransportError
+from .errors import (
+    DetentAPIError,
+    DetentError,
+    DetentQuotaExceeded,
+    DetentTransportError,
+)
 from .models import (
     AcquireResult,
     DayStat,
@@ -116,6 +121,11 @@ def error_body(status: int, text: str) -> dict[str, str]:
 
 
 def api_error(status: int, body: dict[str, str]) -> DetentAPIError:
+    # The monthly hard cap (§4.2) is a 429 the caller should distinguish from a
+    # routine 4xx — surface it as a typed error. Both limit() and lease acquire
+    # route through here, so both get it.
+    if status == 429 and body.get("error") == "monthly_hard_cap":
+        return DetentQuotaExceeded(body)
     return DetentAPIError(status, body)
 
 
