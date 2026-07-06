@@ -41,6 +41,23 @@ def test_error_body_falls_back_on_non_json():
     assert _core.error_body(401, '{"error":"bad key"}') == {"error": "bad key"}
 
 
+def test_error_body_forwards_real_code():
+    assert _core.error_body(403, '{"error":"x","code":"algorithm_not_on_plan"}') == {
+        "error": "x",
+        "code": "algorithm_not_on_plan",
+    }
+
+
+def test_error_body_does_not_forward_null_code():
+    assert _core.error_body(429, '{"error":"monthly_hard_cap","code":null}') == {
+        "error": "monthly_hard_cap"
+    }
+
+
+def test_error_body_codeless_body_stays_error_only():
+    assert _core.error_body(400, '{"error":"invalid_request"}') == {"error": "invalid_request"}
+
+
 def test_should_degrade():
     assert _core.should_degrade(DetentTransportError("x")) is True
     assert _core.should_degrade(DetentAPIError(503, {"error": "x"})) is True

@@ -122,7 +122,7 @@ def error_body(status: int, text: str) -> dict[str, str]:
         parsed = json.loads(text)
         if isinstance(parsed, dict) and "error" in parsed:
             out = {"error": str(parsed["error"])}
-            if "code" in parsed:
+            if parsed.get("code") is not None:
                 out["code"] = str(parsed["code"])
             return out
     except ValueError:
