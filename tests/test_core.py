@@ -81,3 +81,44 @@ def test_api_error_types_the_monthly_hard_cap():
     # A 429 with any other body stays a generic DetentAPIError.
     other = _core.api_error(429, {"error": "slow down"})
     assert type(other) is DetentAPIError
+
+
+def test_api_error_dispatches_public_surface_codes():
+    from detent.errors import (
+        DetentPaymentRequired,
+        DetentAlgorithmNotOnPlan,
+        DetentInvalidRequest,
+        DetentUnknownAlgorithm,
+        DetentInvalidDuration,
+        DetentQuotaExceeded,
+    )
+
+    cases = {
+        "payment_required": (402, DetentPaymentRequired),
+        "monthly_hard_cap": (429, DetentQuotaExceeded),
+        "algorithm_not_on_plan": (403, DetentAlgorithmNotOnPlan),
+        "invalid_request": (400, DetentInvalidRequest),
+        "unknown_algorithm": (400, DetentUnknownAlgorithm),
+        "invalid_duration": (400, DetentInvalidDuration),
+    }
+    for code, (status, cls) in cases.items():
+        e = _core.api_error(status, {"error": "human message", "code": code})
+        assert type(e) is cls
+        assert e.status == status
+        assert e.code == code
+
+
+def test_api_error_falls_back_to_error_string_for_codeless_gate():
+    from detent.errors import DetentQuotaExceeded, DetentPaymentRequired
+
+    assert isinstance(_core.api_error(429, {"error": "monthly_hard_cap"}), DetentQuotaExceeded)
+    assert isinstance(_core.api_error(402, {"error": "payment_required"}), DetentPaymentRequired)
+
+
+def test_api_error_defaults_for_unknown_code():
+    from detent.errors import DetentAPIError
+
+    e = _core.api_error(404, {"error": "not found", "code": "rule_not_found"})
+    assert type(e) is DetentAPIError
+    assert e.status == 404
+    assert e.code == "rule_not_found"

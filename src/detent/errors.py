@@ -18,6 +18,11 @@ class DetentAPIError(DetentError):
         self.status = status
         self.body = body
 
+    @property
+    def code(self) -> str | None:
+        """Stable machine error code, when the API tagged this error (#56/#57)."""
+        return self.body.get("code")
+
 
 class DetentQuotaExceeded(DetentAPIError):
     """The account exceeded its monthly hard ceiling (anti-abuse cap, §4.2).
@@ -32,6 +37,41 @@ class DetentQuotaExceeded(DetentAPIError):
 
     def __init__(self, body: dict[str, str]) -> None:
         super().__init__(429, body)
+
+
+class DetentPaymentRequired(DetentAPIError):
+    """402 — account out of billing good standing (§7). Never failed open."""
+
+    def __init__(self, body: dict[str, str]) -> None:
+        super().__init__(402, body)
+
+
+class DetentAlgorithmNotOnPlan(DetentAPIError):
+    """403 — the rule's algorithm is not available on the account's plan."""
+
+    def __init__(self, body: dict[str, str]) -> None:
+        super().__init__(403, body)
+
+
+class DetentInvalidRequest(DetentAPIError):
+    """400 — malformed request body."""
+
+    def __init__(self, body: dict[str, str]) -> None:
+        super().__init__(400, body)
+
+
+class DetentUnknownAlgorithm(DetentAPIError):
+    """400 — unknown algorithm name."""
+
+    def __init__(self, body: dict[str, str]) -> None:
+        super().__init__(400, body)
+
+
+class DetentInvalidDuration(DetentAPIError):
+    """400 — invalid duration."""
+
+    def __init__(self, body: dict[str, str]) -> None:
+        super().__init__(400, body)
 
 
 class DetentTransportError(DetentError):
