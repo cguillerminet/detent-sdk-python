@@ -166,3 +166,33 @@ def test_acquire_raises_quota_exceeded_on_hard_cap():
 
     with pytest.raises(DetentQuotaExceeded):
         make(handler).acquire(namespace="n", key="k")
+
+
+def test_limit_raises_algorithm_not_on_plan_via_real_response_code():
+    from detent import DetentAlgorithmNotOnPlan
+
+    def handler(req):
+        return httpx.Response(
+            403,
+            json={
+                "error": "algorithm 'token_bucket' is not available on the 'free' plan",
+                "code": "algorithm_not_on_plan",
+            },
+        )
+
+    with pytest.raises(DetentAlgorithmNotOnPlan) as ei:
+        make(handler).limit(namespace="api", key="u1")
+    assert ei.value.status == 403
+    assert ei.value.code == "algorithm_not_on_plan"
+
+
+def test_limit_raises_payment_required_via_real_response_code():
+    from detent import DetentPaymentRequired
+
+    def handler(req):
+        return httpx.Response(402, json={"error": "payment_required", "code": "payment_required"})
+
+    with pytest.raises(DetentPaymentRequired) as ei:
+        make(handler).limit(namespace="api", key="u1")
+    assert ei.value.status == 402
+    assert ei.value.code == "payment_required"
