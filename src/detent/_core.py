@@ -106,6 +106,7 @@ def parse_stats(data: dict[str, Any]) -> StatsResult:
             total=month["total"],
             quota=month["quota"],
             over_quota=month["over_quota"],
+            hard_cap=month.get("hard_cap"),
         ),
     )
 

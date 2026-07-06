@@ -47,6 +47,28 @@ def test_should_degrade():
     assert _core.should_degrade(DetentAPIError(401, {"error": "x"})) is False
 
 
+def test_parse_stats_maps_hard_cap_when_present():
+    data = {
+        "namespace": "api",
+        "total": 100,
+        "blocked": 4,
+        "days": [],
+        "month": {"month": "2026-07", "total": 100, "quota": 1000, "over_quota": False, "hard_cap": 5000},
+    }
+    assert _core.parse_stats(data).month.hard_cap == 5000
+
+
+def test_parse_stats_defaults_hard_cap_to_none_when_absent():
+    data = {
+        "namespace": "api",
+        "total": 100,
+        "blocked": 4,
+        "days": [],
+        "month": {"month": "2026-07", "total": 100, "quota": 1000, "over_quota": False},
+    }
+    assert _core.parse_stats(data).month.hard_cap is None
+
+
 def test_api_error_types_the_monthly_hard_cap():
     from detent.errors import DetentQuotaExceeded
 

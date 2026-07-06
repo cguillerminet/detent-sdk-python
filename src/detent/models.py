@@ -43,6 +43,7 @@ class MonthSummary:
     total: int
     quota: int | None
     over_quota: bool
+    hard_cap: int | None
 
 
 @dataclass(frozen=True)
