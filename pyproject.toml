@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "detent-sdk"
-version = "0.3.1"
+version = "0.3.2"
 description = "Typed Python client for the Detent rate-limiting API."
 readme = "README.md"
 requires-python = ">=3.11"
