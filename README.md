@@ -1,6 +1,6 @@
 # detent-sdk
 
-Typed Python client for the [Detent](https://detent.dev) rate-limiting API. Sync and async, one dependency (httpx).
+Typed Python client for the [Detent](https://detent.fr) rate-limiting API. Sync and async, one dependency (httpx).
 
 ```bash
 pip install detent-sdk
@@ -109,7 +109,7 @@ each to turn them into a response.
 | Option      | Default                    | Notes                                                    |
 |-------------|----------------------------|----------------------------------------------------------|
 | `api_key`   | — (required)               | `dt_live_…` / `dt_test_…`                                 |
-| `base_url`  | `https://api.detent.dev`   | Override for self-host / tests                            |
+| `base_url`  | `https://api.detent.fr`   | Override for self-host / tests                            |
 | `timeout`   | `1.0`                      | Seconds; client-side transport timeout                    |
 | `fail_mode` | `"open"`                   | `"open"` allows, `"closed"` denies on a degraded backend  |
 | `on_error`  | `None`                     | Called on a degraded (transport/5xx) `limit()` call       |
