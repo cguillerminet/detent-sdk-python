@@ -3,8 +3,8 @@
 from .async_client import AsyncDetent
 from .client import Detent
 from .errors import (
-    DetentAPIError,
     DetentAlgorithmNotOnPlan,
+    DetentAPIError,
     DetentError,
     DetentInvalidDuration,
     DetentInvalidRequest,

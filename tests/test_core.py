@@ -70,7 +70,13 @@ def test_parse_stats_maps_hard_cap_when_present():
         "total": 100,
         "blocked": 4,
         "days": [],
-        "month": {"month": "2026-07", "total": 100, "quota": 1000, "over_quota": False, "hard_cap": 5000},
+        "month": {
+            "month": "2026-07",
+            "total": 100,
+            "quota": 1000,
+            "over_quota": False,
+            "hard_cap": 5000,
+        },
     }
     assert _core.parse_stats(data).month.hard_cap == 5000
 
@@ -102,12 +108,12 @@ def test_api_error_types_the_monthly_hard_cap():
 
 def test_api_error_dispatches_public_surface_codes():
     from detent.errors import (
-        DetentPaymentRequired,
         DetentAlgorithmNotOnPlan,
-        DetentInvalidRequest,
-        DetentUnknownAlgorithm,
         DetentInvalidDuration,
+        DetentInvalidRequest,
+        DetentPaymentRequired,
         DetentQuotaExceeded,
+        DetentUnknownAlgorithm,
     )
 
     cases = {
@@ -126,7 +132,7 @@ def test_api_error_dispatches_public_surface_codes():
 
 
 def test_api_error_falls_back_to_error_string_for_codeless_gate():
-    from detent.errors import DetentQuotaExceeded, DetentPaymentRequired
+    from detent.errors import DetentPaymentRequired, DetentQuotaExceeded
 
     assert isinstance(_core.api_error(429, {"error": "monthly_hard_cap"}), DetentQuotaExceeded)
     assert isinstance(_core.api_error(402, {"error": "payment_required"}), DetentPaymentRequired)
