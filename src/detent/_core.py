@@ -7,8 +7,8 @@ from urllib.parse import quote
 
 from ._config import FailMode
 from .errors import (
-    DetentAPIError,
     DetentAlgorithmNotOnPlan,
+    DetentAPIError,
     DetentError,
     DetentInvalidDuration,
     DetentInvalidRequest,
