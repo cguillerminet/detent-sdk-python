@@ -3,11 +3,16 @@
 from .async_client import AsyncDetent
 from .client import Detent
 from .errors import (
+    DetentAlgorithmNotOnPlan,
     DetentAPIError,
     DetentError,
+    DetentInvalidDuration,
+    DetentInvalidRequest,
     DetentLeaseDenied,
+    DetentPaymentRequired,
     DetentQuotaExceeded,
     DetentTransportError,
+    DetentUnknownAlgorithm,
 )
 from .models import (
     AcquireResult,
@@ -27,6 +32,11 @@ __all__ = [
     "DetentTransportError",
     "DetentLeaseDenied",
     "DetentQuotaExceeded",
+    "DetentPaymentRequired",
+    "DetentAlgorithmNotOnPlan",
+    "DetentInvalidRequest",
+    "DetentUnknownAlgorithm",
+    "DetentInvalidDuration",
     "LimitResult",
     "AcquireResult",
     "ReleaseResult",

@@ -377,6 +377,55 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`PATCH /dashboard/me` — update mutable account settings (currently just locale).",
+        "operationId": "update_me",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The updated account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported locale",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/dashboard/namespaces": {
@@ -448,12 +497,64 @@
         }
       }
     },
+    "/dashboard/namespaces/{ns}/leases": {
+      "get": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "`GET /dashboard/namespaces/{ns}/leases` — live active-lease aggregation for\nthe session account's namespace. Fail-closed: no limiter configured or a\nRedis error surfaces as `503`, never a fabricated zero snapshot.",
+        "operationId": "dashboard_leases",
+        "parameters": [
+          {
+            "name": "ns",
+            "in": "path",
+            "description": "Namespace name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Live active-lease snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeasesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Redis unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/dashboard/namespaces/{ns}/rules": {
       "put": {
         "tags": [
           "dashboard"
         ],
-        "summary": "`PUT /dashboard/namespaces/{ns}/rules` — create or replace the namespace's\ndefault rule. Idempotent; also materializes the namespace. Validation mirrors\n`rules::create_rule`, plus a `concurrent_limit` guard (it is lease-based, not\na `/v1/limit` default — see DECISIONS.md §2.3 / §4.3).",
+        "summary": "`PUT /dashboard/namespaces/{ns}/rules` — create or replace the namespace's\ndefault rule. Idempotent; also materializes the namespace. Validation mirrors\n`rules::create_rule`. `concurrent_limit` is accepted here (Pro/Scale, plan-gated\nbelow); it is read by the lease engine as the namespace's fallback limit/TTL\n(see DECISIONS.md §2.3 / §4.3).",
         "operationId": "put_rule",
         "parameters": [
           {
@@ -488,7 +589,7 @@
             }
           },
           "400": {
-            "description": "limit/window_ms invalid, or concurrent_limit",
+            "description": "limit/window_ms invalid",
             "content": {
               "application/json": {
                 "schema": {
@@ -1513,7 +1614,8 @@
           "email",
           "plan",
           "in_good_standing",
-          "has_billing_customer"
+          "has_billing_customer",
+          "locale"
         ],
         "properties": {
           "current_period_end": {
@@ -1534,6 +1636,10 @@
           },
           "in_good_standing": {
             "type": "boolean"
+          },
+          "locale": {
+            "type": "string",
+            "description": "UI/email language for this account: \"fr\" | \"en\"."
           },
           "plan": {
             "type": "string"
@@ -1766,14 +1872,38 @@
       },
       "ErrorResponse": {
         "type": "object",
-        "description": "The JSON body returned for every error response: `{ \"error\": \"<message>\" }`.",
+        "description": "The JSON body returned for every error response: `{ \"error\": \"<message>\" }`,\noptionally with a stable machine `code` (`{ \"error\": ..., \"code\": ... }`).\nThe `code` lets clients map an error to their own localized copy instead of\nshowing the English `error` string; it is present only for errors we've\nassigned a stable code, and omitted otherwise.",
         "required": [
           "error"
         ],
         "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stable machine-readable error code for client-side localization, when one\nis defined for this error (e.g. `key_not_found`, `algorithm_not_on_plan`)."
+          },
           "error": {
             "type": "string",
             "description": "Human-readable error message. Never contains internal/driver detail."
+          }
+        }
+      },
+      "KeyActiveOut": {
+        "type": "object",
+        "required": [
+          "key",
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "key": {
+            "type": "string"
           }
         }
       },
@@ -1814,6 +1944,49 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "LeasesResponse": {
+        "type": "object",
+        "required": [
+          "namespace",
+          "total_active",
+          "active_keys",
+          "top_keys",
+          "truncated"
+        ],
+        "properties": {
+          "active_keys": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The namespace's concurrent_limit rule limit (per-key slots), or null.",
+            "minimum": 0
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "top_keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KeyActiveOut"
+            }
+          },
+          "total_active": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean"
           }
         }
       },
@@ -1895,6 +2068,15 @@
           "over_quota"
         ],
         "properties": {
+          "hard_cap": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "§4.2 anti-abuse ceiling for this plan; `None` when unconfigured.",
+            "minimum": 0
+          },
           "month": {
             "type": "string"
           },
@@ -2075,6 +2257,17 @@
           "total": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "UpdateMeBody": {
+        "type": "object",
+        "required": [
+          "locale"
+        ],
+        "properties": {
+          "locale": {
+            "type": "string"
           }
         }
       },

@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote
 
 from ._config import FailMode
 from .errors import (
+    DetentAlgorithmNotOnPlan,
     DetentAPIError,
     DetentError,
+    DetentInvalidDuration,
+    DetentInvalidRequest,
+    DetentPaymentRequired,
     DetentQuotaExceeded,
     DetentTransportError,
+    DetentUnknownAlgorithm,
 )
 from .models import (
     AcquireResult,
@@ -106,6 +112,7 @@ def parse_stats(data: dict[str, Any]) -> StatsResult:
             total=month["total"],
             quota=month["quota"],
             over_quota=month["over_quota"],
+            hard_cap=month.get("hard_cap"),
         ),
     )
 
@@ -114,18 +121,32 @@ def error_body(status: int, text: str) -> dict[str, str]:
     try:
         parsed = json.loads(text)
         if isinstance(parsed, dict) and "error" in parsed:
-            return {"error": str(parsed["error"])}
+            out = {"error": str(parsed["error"])}
+            if parsed.get("code") is not None:
+                out["code"] = str(parsed["code"])
+            return out
     except ValueError:
         pass
     return {"error": f"HTTP {status}"}
 
 
+_ERROR_BY_CODE: dict[str, Callable[[dict[str, str]], DetentAPIError]] = {
+    "payment_required": DetentPaymentRequired,
+    "monthly_hard_cap": DetentQuotaExceeded,
+    "algorithm_not_on_plan": DetentAlgorithmNotOnPlan,
+    "invalid_request": DetentInvalidRequest,
+    "unknown_algorithm": DetentUnknownAlgorithm,
+    "invalid_duration": DetentInvalidDuration,
+}
+
+
 def api_error(status: int, body: dict[str, str]) -> DetentAPIError:
-    # The monthly hard cap (§4.2) is a 429 the caller should distinguish from a
-    # routine 4xx — surface it as a typed error. Both limit() and lease acquire
-    # route through here, so both get it.
-    if status == 429 and body.get("error") == "monthly_hard_cap":
-        return DetentQuotaExceeded(body)
+    # Key off the machine ``code`` (#56/#57); fall back to the legacy ``error``
+    # string so an SDK pointed at an API predating the gate ``code`` still
+    # yields the typed quota/payment errors. Unknown codes -> DetentAPIError.
+    cls = _ERROR_BY_CODE.get(body.get("code") or body.get("error", ""))
+    if cls is not None:
+        return cls(body)
     return DetentAPIError(status, body)
 
 
