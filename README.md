@@ -37,6 +37,73 @@ async with AsyncDetent(api_key="dt_live_...") as rg:
         await run_expensive_job()
 ```
 
+### FastAPI
+
+Enforce limits with a dependency — it runs before the handler, composes per-route,
+and shows up in the OpenAPI schema. Create one client in the lifespan and reuse it:
+
+```python
+from contextlib import asynccontextmanager
+from math import ceil
+
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from detent import AsyncDetent, DetentLeaseDenied
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with AsyncDetent(api_key="dt_live_...") as rg:
+        app.state.detent = rg
+        yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+def rate_limit(namespace: str):
+    async def dep(request: Request, response: Response) -> None:
+        rg: AsyncDetent = request.app.state.detent
+        # Throttle identity: an API key, a user id, or the client IP. Trust
+        # X-Forwarded-For only if it's set by a proxy you control.
+        key = request.client.host if request.client else "anon"
+        r = await rg.limit(namespace=namespace, key=key)
+        response.headers["X-RateLimit-Remaining"] = str(r.remaining)
+        if not r.allowed:  # a verdict, not an exception — you emit the 429
+            retry_after = max(1, ceil(r.reset_ms / 1000))
+            raise HTTPException(429, "Rate limit exceeded",
+                                headers={"Retry-After": str(retry_after)})
+    return dep
+
+
+@app.get("/search", dependencies=[Depends(rate_limit("api"))])
+async def search(q: str):
+    return {"q": q}
+```
+
+For a **concurrency cap**, hold a lease for the handler's lifetime with a `yield`
+dependency — the slot is auto-released even if the handler raises, and a full
+namespace raises `DetentLeaseDenied`:
+
+```python
+async def with_slot(request: Request):
+    rg: AsyncDetent = request.app.state.detent
+    key = request.client.host if request.client else "anon"
+    try:
+        async with rg.lease(namespace="jobs", key=key):
+            yield
+    except DetentLeaseDenied:
+        raise HTTPException(429, "Too many concurrent requests")
+
+
+@app.post("/report", dependencies=[Depends(with_slot)])
+async def generate_report():
+    ...
+```
+
+The account-level policy errors (`DetentQuotaExceeded` 429, `DetentPaymentRequired`
+402) propagate out of `limit()`/`lease()`; register an `@app.exception_handler` for
+each to turn them into a response.
+
 ### Configuration
 
 | Option      | Default                    | Notes                                                    |
