@@ -12,6 +12,7 @@ from .errors import (
     DetentError,
     DetentInvalidDuration,
     DetentInvalidRequest,
+    DetentKeyTypeConflict,
     DetentPaymentRequired,
     DetentQuotaExceeded,
     DetentTransportError,
@@ -137,6 +138,7 @@ _ERROR_BY_CODE: dict[str, Callable[[dict[str, str]], DetentAPIError]] = {
     "invalid_request": DetentInvalidRequest,
     "unknown_algorithm": DetentUnknownAlgorithm,
     "invalid_duration": DetentInvalidDuration,
+    "key_type_conflict": DetentKeyTypeConflict,
 }
 
 

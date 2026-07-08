@@ -140,3 +140,18 @@ try:
 except DetentQuotaExceeded:
     ...  # account over its monthly ceiling → page ops / upgrade nudge
 ```
+
+When a namespace+key is reused for a different rate-limit algorithm than the
+one it already holds state for, the API returns `409` and `limit()`/`acquire()`
+(sync and async) raise **`DetentKeyTypeConflict`** (a `DetentAPIError`
+subclass). This applies to both `/v1/limit` and `/v1/leases`. It is a hard
+deny — a caller bug, not a degraded backend — and is **never** failed open:
+
+```python
+from detent import DetentKeyTypeConflict
+
+try:
+    result = client.limit(namespace="api", key=user_id)
+except DetentKeyTypeConflict:
+    ...  # namespace+key already used with another algorithm → fix the caller
+```
