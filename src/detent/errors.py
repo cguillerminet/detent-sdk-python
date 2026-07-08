@@ -74,6 +74,20 @@ class DetentInvalidDuration(DetentAPIError):
         super().__init__(400, body)
 
 
+class DetentKeyTypeConflict(DetentAPIError):
+    """409 — the namespace+key already holds state for a different algorithm.
+
+    The API returned ``409 {"error": "...", "code": "key_type_conflict"}``
+    from ``/v1/limit`` or ``/v1/leases``: a hard deny, not a rate-limit
+    verdict. Subclasses :class:`DetentAPIError`, so it carries ``status``
+    (always 409) and ``body``. It is **never** failed open — reusing a key
+    across algorithms is a caller bug, not a degraded backend.
+    """
+
+    def __init__(self, body: dict[str, str]) -> None:
+        super().__init__(409, body)
+
+
 class DetentTransportError(DetentError):
     """A network/DNS/timeout failure reaching the Detent API."""
 

@@ -111,6 +111,7 @@ def test_api_error_dispatches_public_surface_codes():
         DetentAlgorithmNotOnPlan,
         DetentInvalidDuration,
         DetentInvalidRequest,
+        DetentKeyTypeConflict,
         DetentPaymentRequired,
         DetentQuotaExceeded,
         DetentUnknownAlgorithm,
@@ -123,6 +124,7 @@ def test_api_error_dispatches_public_surface_codes():
         "invalid_request": (400, DetentInvalidRequest),
         "unknown_algorithm": (400, DetentUnknownAlgorithm),
         "invalid_duration": (400, DetentInvalidDuration),
+        "key_type_conflict": (409, DetentKeyTypeConflict),
     }
     for code, (status, cls) in cases.items():
         e = _core.api_error(status, {"error": "human message", "code": code})
@@ -145,3 +147,16 @@ def test_api_error_defaults_for_unknown_code():
     assert type(e) is DetentAPIError
     assert e.status == 404
     assert e.code == "rule_not_found"
+
+
+def test_api_error_types_the_key_type_conflict():
+    from detent.errors import DetentKeyTypeConflict
+
+    e = _core.api_error(409, {"error": "key type conflict", "code": "key_type_conflict"})
+    assert isinstance(e, DetentKeyTypeConflict)
+    assert isinstance(e, DetentAPIError)
+    assert e.status == 409
+    assert e.code == "key_type_conflict"
+    # A hard deny (namespace+key reused for a different algorithm) must never
+    # fail open.
+    assert _core.should_degrade(e) is False
